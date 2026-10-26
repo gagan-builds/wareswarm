@@ -82,8 +82,9 @@ npm run dev
 *Frontend will run at `http://localhost:3000`.*
 
 ### 3. Seed Demo Data (1-Click Setup)
-In a new terminal window:
+In a new terminal window, navigate to the `wareswarm` folder first:
 ```powershell
+cd "c:\Users\user\Downloads\Ware AI\wareswarm"
 python scripts/seed_demo.py
 ```
 *Populates all four organization workspaces, test users, historical runs, custom maps, API keys, and invoices.*
@@ -97,6 +98,7 @@ After running `python scripts/seed_demo.py`, you can log into any of these prelo
 | Role | Username | Password | Access / Tier |
 |---|---|---|---|
 | **Platform Administrator** | `admin` | `AdminPassword123!` | Global Admin Console (`/admin`), MRR analytics, plan overrides |
+| **Platform Admin (Owner)** | `putin` | `putin123` | Platform Admin (`/admin`), Enterprise Tier |
 | **Pro Engineer** | `pro_engineer` | `ProPassword123!` | Active 14-day Pro trial (20 robots, Space-Time A\*, heatmaps) |
 | **Team Lead** | `team_lead` | `TeamPassword123!` | 10 team seats, member invites, annual billing |
 | **Fleet Operator** | `fleet_operator` | `TeamPassword123!` | Collaborative member (can run simulations) |

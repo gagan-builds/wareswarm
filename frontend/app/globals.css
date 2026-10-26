@@ -1,0 +1,51 @@
+/*
+ * Purpose: Global stylesheet and theme definitions for the WareSwarm web application.
+ * Role in the project: Injects Tailwind base styles, defines CSS custom properties, scrollbar styling, and canvas pixelation rules.
+ * Key contents: CSS variables, custom dark scrollbar, pixelated canvas rendering, KPI card glow effects, event text colors.
+ * Talks to: frontend/app/layout.tsx and all components rendering HTML elements.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme CSS custom property color tokens */
+:root {
+  --background: #0a0e1a;
+  --surface: #111827;
+  --surface-2: #1f2937;
+  --accent: #3b82f6;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+}
+
+body {
+  background-color: var(--background);
+  color: #f3f4f6;
+}
+
+/* Custom dark scrollbar styling for scrollable sidebars and event log feeds */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+
+/* Crisp canvas pixel rendering without blur when scaling warehouse grid */
+canvas { image-rendering: pixelated; }
+
+/* KPI metric card hover glow effect */
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid #1f2937;
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  transition: border-color 0.2s;
+}
+.kpi-card:hover { border-color: var(--accent); }
+
+/* Live event log text colors matching simulation severity */
+.event-collision { color: #ef4444; }
+.event-deadlock_resolved { color: #f59e0b; }
+.event-task_completed { color: #10b981; }
+.event-replan { color: #8b5cf6; }
+.event-conflict_resolved { color: #3b82f6; }

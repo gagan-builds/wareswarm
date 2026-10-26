@@ -1,0 +1,28 @@
+# =============================================================================
+# backend/requirements.txt - Python Backend Dependencies
+#
+# Purpose:
+#   Lists all external Python packages required to run the WareSwarm FastAPI server,
+#   planning algorithms, SQLite ORM, and WebSocket streaming.
+#
+# Role in the project:
+#   Installed via `pip install -r requirements.txt` during setup or container build.
+# =============================================================================
+
+# Web framework and ASGI server
+fastapi>=0.111.0          # REST API endpoints, routing, and request validation
+uvicorn[standard]>=0.29.0 # High-performance ASGI web server with WebSocket support
+
+# Data validation & configuration
+pydantic>=2.7.0           # Request/response schema models and data validation
+pydantic-settings>=2.3.0  # Environment variable loading and configuration
+
+# Computational & math libraries
+numpy>=1.26.0             # 2D grid matrix indexing, distance math, array operations
+scipy>=1.13.0             # linear_sum_assignment for Hungarian task allocation
+
+# Persistence & communication
+sqlalchemy>=2.0.0         # ORM for SQLite database (run history, custom maps, users)
+websockets>=12.0          # Real-time bi-directional state streaming to frontend
+python-multipart>=0.0.9   # Form data parsing for file uploads and authentication
+

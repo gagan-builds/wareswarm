@@ -1,0 +1,50 @@
+# =============================================================================
+# docker-compose.yml - Multi-Container Orchestration Definition
+#
+# Purpose:
+#   Orchestrates the backend (FastAPI, port 8000) and frontend (Next.js, port 3000)
+#   services in isolated Docker containers with networking and health checks.
+#
+# Role in the project:
+#   Enables 1-command startup (`docker compose up --build`) for running the entire
+#   WareSwarm platform in production or viva evaluation environments.
+#
+# Services:
+#   - backend: Python 3.11 FastAPI server, SQLite volume, port 8000
+#   - frontend: Node.js 18 Next.js 14 web client, port 3000 (waits for backend health)
+# =============================================================================
+
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./wareswarm.db
+      - CORS_ORIGINS=http://localhost:3000,http://frontend:3000
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped

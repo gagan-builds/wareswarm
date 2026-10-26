@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Testing & Coverage
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*$py.class
+.coverage
+htmlcov/
+.nyc_output
+
+# Production & Build outputs
+.next/
+out/
+build/
+dist/
+*.egg-info/
+
+# Databases & local state
+*.db
+*.sqlite
+*.sqlite3
+wareswarm.db
+*.log
+
+# Environment files (keep .env.example)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!*.env.example
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Scratch & patch files
+dummy.txt
+patch_*.py

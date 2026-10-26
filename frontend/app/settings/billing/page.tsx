@@ -27,13 +27,14 @@ export default function BillingSettingsPage() {
     try {
       setLoading(true);
       const [subData, usageData, invData] = await Promise.all([
-        api.getSubscription(),
-        api.getUsage(),
+        api.getSubscription().catch(() => null),
+        api.getUsage().catch(() => null),
         api.getInvoices().catch(() => ({ invoices: [] })),
       ]);
-      setSubInfo(subData);
-      setUsage(usageData);
-      setInvoices(invData.invoices || []);
+      if (subData) setSubInfo(subData);
+      if (usageData) setUsage(usageData);
+      const list = Array.isArray(invData) ? invData : (invData?.invoices || []);
+      setInvoices(list);
     } catch (err: any) {
       console.error('Failed to load billing data:', err);
     } finally {
@@ -277,124 +278,142 @@ export default function BillingSettingsPage() {
           </div>
 
           {/* Usage Meters */}
-          <div className="mt-8">
-            <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider mb-6">
-              Monthly Usage & Plan Limits
-            </h3>
+          {(() => {
+            const rawMeters = (usage as any)?.meters || {};
+            const simRuns = rawMeters.simulation_runs || {};
+            const robots = rawMeters.robots_per_sim || rawMeters.robots || {};
+            const maps = rawMeters.saved_maps || {};
+            const apiCalls = rawMeters.api_calls || {};
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Simulation Runs */}
-              <div className="bg-surface-2/60 rounded-2xl p-5 border border-gray-800">
-                <div className="flex items-center justify-between text-xs mb-2">
-                  <span className="font-semibold text-gray-300">Sim Runs this Month</span>
-                  <span className="text-[11px] font-bold text-gray-400">
-                    {usage?.meters.simulation_runs.pct ?? 0}%
-                  </span>
+            const simPct = Number(simRuns.percentage ?? simRuns.pct ?? 0);
+            const simUsed = Number(simRuns.used ?? 0);
+            const simMax = simRuns.unlimited || simRuns.max === -1 ? 'Unlimited' : (simRuns.max ?? simRuns.limit ?? 50);
+
+            const robPct = Number(robots.percentage ?? robots.pct ?? 100);
+            const robUsed = Number(robots.used ?? 5);
+            const robMax = robots.unlimited || robots.max === -1 ? 'Unlimited' : (robots.max ?? robots.limit ?? 5);
+
+            const mapPct = Number(maps.percentage ?? maps.pct ?? 0);
+            const mapUsed = Number(maps.used ?? 0);
+            const mapMax = maps.unlimited || maps.max === -1 ? 'Unlimited' : (maps.max ?? maps.limit ?? 1);
+
+            const apiPct = Number(apiCalls.percentage ?? apiCalls.pct ?? 0);
+            const apiUsed = Number(apiCalls.used ?? 0);
+            const apiMax = apiCalls.unlimited || apiCalls.max === -1 ? 'Unlimited' : (apiCalls.max ?? apiCalls.limit ?? 'Locked');
+
+            return (
+              <div className="mt-8">
+                <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider mb-6">
+                  Monthly Usage & Plan Limits
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {/* Simulation Runs */}
+                  <div className="bg-surface-2/60 rounded-2xl p-5 border border-gray-800">
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span className="font-semibold text-gray-300">Sim Runs this Month</span>
+                      <span className="text-[11px] font-bold text-gray-400">
+                        {simPct}%
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-white mb-2">
+                      {simUsed}
+                      <span className="text-xs text-gray-400 font-normal ml-1">
+                        / {simMax}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-gray-800 overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-500 ${getMeterColor(simPct)}`}
+                        style={{ width: `${Math.min(simPct, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Robots Fleet Limit */}
+                  <div className="bg-surface-2/60 rounded-2xl p-5 border border-gray-800">
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span className="font-semibold text-gray-300">Robots per Simulation</span>
+                      <span className="text-[11px] font-bold text-gray-400">
+                        {robPct}%
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-white mb-2">
+                      {robUsed}
+                      <span className="text-xs text-gray-400 font-normal ml-1">
+                        / {robMax} max
+                      </span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-gray-800 overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-500 ${getMeterColor(robPct)}`}
+                        style={{ width: `${Math.min(robPct, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Saved Custom Maps */}
+                  <div className="bg-surface-2/60 rounded-2xl p-5 border border-gray-800">
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span className="font-semibold text-gray-300">Saved Custom Maps</span>
+                      <span className="text-[11px] font-bold text-gray-400">
+                        {mapPct}%
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-white mb-2">
+                      {mapUsed}
+                      <span className="text-xs text-gray-400 font-normal ml-1">
+                        / {mapMax}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-gray-800 overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-500 ${getMeterColor(mapPct)}`}
+                        style={{ width: `${Math.min(mapPct, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* API Calls */}
+                  <div className="bg-surface-2/60 rounded-2xl p-5 border border-gray-800">
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span className="font-semibold text-gray-300">API Calls this Month</span>
+                      <span className="text-[11px] font-bold text-gray-400">
+                        {apiPct}%
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-white mb-2">
+                      {apiUsed}
+                      <span className="text-xs text-gray-400 font-normal ml-1">
+                        / {apiMax}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-gray-800 overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-500 ${getMeterColor(apiPct)}`}
+                        style={{ width: `${Math.min(apiPct, 100)}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="text-2xl font-black text-white mb-2">
-                  {usage?.meters.simulation_runs.used ?? 0}
-                  <span className="text-xs text-gray-400 font-normal ml-1">
-                    / {usage?.meters.simulation_runs.limit ?? 50}
-                  </span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-gray-800 overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-500 ${getMeterColor(
-                      usage?.meters.simulation_runs.pct ?? 0
-                    )}`}
-                    style={{ width: `${Math.min(usage?.meters.simulation_runs.pct ?? 0, 100)}%` }}
-                  />
+
+                <div className="mt-4 flex items-center justify-between text-[11px] text-gray-400">
+                  <div className="flex items-center gap-4">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-accent" /> Normal (&lt;80%)
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-500" /> Approaching Limit (≥80%)
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-rose-500" /> Limit Reached (100%)
+                    </span>
+                  </div>
+                  <div>Usage counters reset automatically on the 1st of each month.</div>
                 </div>
               </div>
-
-              {/* Robots Fleet Limit */}
-              <div className="bg-surface-2/60 rounded-2xl p-5 border border-gray-800">
-                <div className="flex items-center justify-between text-xs mb-2">
-                  <span className="font-semibold text-gray-300">Robots per Simulation</span>
-                  <span className="text-[11px] font-bold text-gray-400">
-                    {usage?.meters.robots.pct ?? 0}%
-                  </span>
-                </div>
-                <div className="text-2xl font-black text-white mb-2">
-                  {usage?.meters.robots.used ?? 0}
-                  <span className="text-xs text-gray-400 font-normal ml-1">
-                    / {usage?.meters.robots.limit ?? 5} max
-                  </span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-gray-800 overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-500 ${getMeterColor(
-                      usage?.meters.robots.pct ?? 0
-                    )}`}
-                    style={{ width: `${Math.min(usage?.meters.robots.pct ?? 0, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Saved Custom Maps */}
-              <div className="bg-surface-2/60 rounded-2xl p-5 border border-gray-800">
-                <div className="flex items-center justify-between text-xs mb-2">
-                  <span className="font-semibold text-gray-300">Saved Custom Maps</span>
-                  <span className="text-[11px] font-bold text-gray-400">
-                    {usage?.meters.saved_maps.pct ?? 0}%
-                  </span>
-                </div>
-                <div className="text-2xl font-black text-white mb-2">
-                  {usage?.meters.saved_maps.used ?? 0}
-                  <span className="text-xs text-gray-400 font-normal ml-1">
-                    / {usage?.meters.saved_maps.limit ?? 1}
-                  </span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-gray-800 overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-500 ${getMeterColor(
-                      usage?.meters.saved_maps.pct ?? 0
-                    )}`}
-                    style={{ width: `${Math.min(usage?.meters.saved_maps.pct ?? 0, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* API Calls */}
-              <div className="bg-surface-2/60 rounded-2xl p-5 border border-gray-800">
-                <div className="flex items-center justify-between text-xs mb-2">
-                  <span className="font-semibold text-gray-300">API Calls this Month</span>
-                  <span className="text-[11px] font-bold text-gray-400">
-                    {usage?.meters.api_calls.pct ?? 0}%
-                  </span>
-                </div>
-                <div className="text-2xl font-black text-white mb-2">
-                  {usage?.meters.api_calls.used ?? 0}
-                  <span className="text-xs text-gray-400 font-normal ml-1">
-                    / {usage?.meters.api_calls.limit === 0 ? 'Locked' : usage?.meters.api_calls.limit}
-                  </span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-gray-800 overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-500 ${getMeterColor(
-                      usage?.meters.api_calls.pct ?? 0
-                    )}`}
-                    style={{ width: `${Math.min(usage?.meters.api_calls.pct ?? 0, 100)}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-center justify-between text-[11px] text-gray-400">
-              <div className="flex items-center gap-4">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-accent" /> Normal (&lt;80%)
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-amber-500" /> Approaching Limit (≥80%)
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" /> Limit Reached (100%)
-                </span>
-              </div>
-              <div>Usage counters reset automatically on the 1st of each month.</div>
-            </div>
-          </div>
+            );
+          })()}
         </div>
 
         {/* Promo Coupon Redemption */}

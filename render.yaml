@@ -1,0 +1,23 @@
+# =============================================================================
+# render.yaml - Render Blueprint for WareSwarm Backend
+#
+# Purpose:
+#   Defines the Render Web Service configuration for 1-click backend deployment.
+# =============================================================================
+
+services:
+  - type: web
+    name: wareswarm-backend
+    env: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/seed_demo.py && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PRODUCT_NAME
+        value: WareSwarm
+      - key: DATABASE_URL
+        value: sqlite:///./wareswarm.db
+      - key: CORS_ORIGINS
+        value: "*"

@@ -1,0 +1,11 @@
+# =============================================================================
+# netlify.toml - Netlify Configuration for WareSwarm Next.js Frontend
+# =============================================================================
+
+[build]
+  base = "frontend"
+  publish = ".next"
+  command = "npm run build"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

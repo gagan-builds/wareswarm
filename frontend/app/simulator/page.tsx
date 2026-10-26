@@ -37,6 +37,24 @@ export default function SimulatorPage() {
   const { state, status, refresh, setState } = useSimWebSocket();
   const [clickMode, setClickMode] = useState<string>('none');
   const [taskPickup, setTaskPickup] = useState<[number, number] | null>(null);
+  const [customApiInput, setCustomApiInput] = useState('');
+  const [isConnectingCustom, setIsConnectingCustom] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('wareswarm_api_url') || '';
+      setCustomApiInput(saved);
+    }
+  }, []);
+
+  const handleSetCustomApi = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customApiInput.trim()) return;
+    const clean = customApiInput.trim().replace(/\/+$/, '');
+    localStorage.setItem('wareswarm_api_url', clean);
+    setIsConnectingCustom(true);
+    window.location.reload();
+  };
 
   const handleDemoUnlock = async () => {
     setDemoLoggingIn(true);
@@ -271,9 +289,28 @@ export default function SimulatorPage() {
               <span className="text-3xl mb-3">🔌</span>
               <h3 className="text-lg font-bold text-white mb-2">Connecting to Backend Simulator...</h3>
               <p className="text-sm text-gray-400 max-w-md mb-4">
-                Please make sure the Python backend server is running on port 8000.
+                Enter your live Render backend URL or start the local Python server.
               </p>
-              <div className="bg-surface-2 border border-gray-700 rounded-lg p-3 text-xs font-mono text-accent select-all">
+              
+              <form onSubmit={handleSetCustomApi} className="flex flex-col sm:flex-row items-center gap-2 max-w-md w-full mb-4">
+                <input
+                  type="url"
+                  placeholder="https://your-backend.onrender.com"
+                  value={customApiInput}
+                  onChange={(e) => setCustomApiInput(e.target.value)}
+                  className="bg-surface-2 border border-gray-600 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 flex-1 w-full focus:outline-none focus:border-accent"
+                />
+                <button
+                  type="submit"
+                  disabled={isConnectingCustom}
+                  className="px-4 py-2 bg-accent hover:bg-accent-hover text-black font-semibold text-xs rounded-lg transition-colors shrink-0"
+                >
+                  {isConnectingCustom ? 'Connecting...' : 'Connect Backend'}
+                </button>
+              </form>
+
+              <div className="text-[11px] text-gray-400 mb-1.5">Or for local development:</div>
+              <div className="bg-surface-2 border border-gray-700 rounded-lg p-2.5 text-xs font-mono text-accent select-all">
                 cd wareswarm/backend && python -m uvicorn app.main:app --port 8000
               </div>
             </div>

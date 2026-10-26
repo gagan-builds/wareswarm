@@ -11,8 +11,12 @@
  * @returns {string} The base URL for REST API calls (e.g. 'http://localhost:8000').
  */
 export function getApiUrl(): string {
+  if (typeof window !== 'undefined') {
+    const customUrl = localStorage.getItem('wareswarm_api_url');
+    if (customUrl) return customUrl.trim().replace(/\/+$/, '');
+  }
   if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
+    return process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, '');
   }
   if (typeof window !== 'undefined') {
     const protocol = window.location.protocol;

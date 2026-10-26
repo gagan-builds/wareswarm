@@ -16,8 +16,19 @@ import { api } from './api';
  * Uses wss:// if current connection is HTTPS, otherwise ws://.
  */
 function getWsUrl(): string {
+  if (typeof window !== 'undefined') {
+    const customApi = localStorage.getItem('wareswarm_api_url');
+    if (customApi) {
+      const clean = customApi.trim().replace(/\/+$/, '');
+      return clean.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
+    }
+  }
   if (process.env.NEXT_PUBLIC_WS_URL) {
-    return process.env.NEXT_PUBLIC_WS_URL;
+    return process.env.NEXT_PUBLIC_WS_URL.trim().replace(/\/+$/, '');
+  }
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    const clean = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, '');
+    return clean.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
   }
   if (typeof window !== 'undefined') {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

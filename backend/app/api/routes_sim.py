@@ -84,7 +84,9 @@ class SimConfigRequest(BaseModel):
 
     allocation: Literal["nearest", "hungarian"] = "nearest"
 
-    task_rate: float = Field(default=0.3, ge=0.0, le=1.0)
+    task_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    auto_assign_tasks: Optional[bool] = False
 
     seed: Optional[int] = None
 
@@ -148,6 +150,11 @@ class AssignRobotRouteRequest(BaseModel):
 class RobotPriorityRequest(BaseModel):
     robot_id: int
     priority: int = Field(default=2, ge=1, le=4)
+
+
+class AutoAssignRequest(BaseModel):
+    enabled: bool
+    task_rate: Optional[float] = 0.3
 
 
 class ObstacleRequest(BaseModel):
@@ -294,6 +301,8 @@ async def get_config():
 
         "task_rate": cfg.task_rate,
 
+        "auto_assign_tasks": getattr(cfg, "auto_assign_tasks", False),
+
         "seed": cfg.seed,
 
         "speed": cfg.speed,
@@ -438,6 +447,14 @@ async def set_robot_priority_endpoint(req: RobotPriorityRequest):
         raise HTTPException(404, f"Robot {req.robot_id} not found")
     await _notify()
     return {"status": "success", "robot_id": req.robot_id, "priority": req.priority}
+
+
+@router.post("/auto-assign")
+async def toggle_auto_assign(req: AutoAssignRequest):
+    """Enable or disable automated system task generation and assignment."""
+    res = simulator.set_auto_assign(req.enabled, req.task_rate or 0.3)
+    await _notify()
+    return res
 
 
 @router.post("/obstacle")

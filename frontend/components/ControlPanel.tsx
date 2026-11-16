@@ -90,7 +90,9 @@ export default function ControlPanel({
 
     allocation: 'nearest',
 
-    task_rate: 0.3,
+    task_rate: 0.0,
+
+    auto_assign_tasks: false,
 
     seed: '42',
 
@@ -195,6 +197,8 @@ export default function ControlPanel({
 
         task_rate: state.config?.task_rate ?? prev.task_rate,
 
+        auto_assign_tasks: state.config?.auto_assign_tasks ?? prev.auto_assign_tasks,
+
         seed: state.config?.seed !== null && state.config?.seed !== undefined ? String(state.config.seed) : prev.seed,
 
         speed: state.config?.speed ?? prev.speed,
@@ -213,13 +217,29 @@ export default function ControlPanel({
 
 
 
+  const handleToggleAutoAssign = async (enabled: boolean) => {
+    try {
+      await api.setAutoAssign(enabled);
+      setCfg((prev: any) => ({
+        ...prev,
+        auto_assign_tasks: enabled,
+        task_rate: enabled ? (Number(prev.task_rate) > 0 ? prev.task_rate : 0.3) : 0.0,
+      }));
+      setAppliedNotice(enabled ? '⚡ Auto-Task Assignment Enabled' : '👤 User-Assigned Mode Active (Auto-Assign Disabled)');
+      setTimeout(() => setAppliedNotice(null), 3500);
+    } catch (e) {
+      console.error('Failed to toggle auto-assign:', e);
+    }
+  };
+
   const handleApplyOnly = async () => {
     const payload = {
       ...cfg,
       num_robots: Number(cfg.num_robots),
       seed: String(cfg.seed).trim() === '' ? null : Number(cfg.seed),
       connectivity: Number(cfg.connectivity),
-      task_rate: Number(cfg.task_rate),
+      task_rate: Boolean(cfg.auto_assign_tasks) ? Number(cfg.task_rate) : 0.0,
+      auto_assign_tasks: Boolean(cfg.auto_assign_tasks),
       speed: Number(cfg.speed),
       grid_width: Number(cfg.grid_width),
       grid_height: Number(cfg.grid_height),
@@ -237,36 +257,21 @@ export default function ControlPanel({
     setTimeout(() => setAppliedNotice(null), 3000);
   };
 
-
-
   const handleApplyAndReset = async (overrideCfg?: any) => {
-
     const base = (overrideCfg && typeof overrideCfg === 'object' && 'num_robots' in overrideCfg) ? overrideCfg : cfg;
-
     setCfg(base);
-
     const payload = {
-
       ...base,
-
       num_robots: Number(base.num_robots),
-
       seed: String(base.seed).trim() === '' ? null : Number(base.seed),
-
       connectivity: Number(base.connectivity),
-
-      task_rate: Number(base.task_rate),
-
+      task_rate: Boolean(base.auto_assign_tasks) ? Number(base.task_rate) : 0.0,
+      auto_assign_tasks: Boolean(base.auto_assign_tasks),
       speed: Number(base.speed),
-
       grid_width: Number(base.grid_width),
-
       grid_height: Number(base.grid_height),
-
     };
-
     onReset(payload);
-
   };
 
 
@@ -753,6 +758,53 @@ export default function ControlPanel({
 
           {(openSections.manualAssign ?? true) && (
             <div className="p-3 space-y-3">
+              {/* Feature Toggle: User Manual Tasking vs Auto-Assign */}
+              <div className="bg-surface/90 border border-sky-500/30 rounded-lg p-2.5 space-y-2 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-white flex items-center gap-1">
+                    <span>⚡</span> Task Assignment Mode:
+                  </span>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                    state?.config?.auto_assign_tasks
+                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-600/50'
+                      : 'bg-indigo-950 text-indigo-300 border border-indigo-600/50'
+                  }`}>
+                    {state?.config?.auto_assign_tasks ? 'AUTO-ASSIGN' : 'USER-ASSIGNED'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleAutoAssign(false)}
+                    className={`py-1.5 px-2 rounded text-[11px] font-bold transition-all border flex items-center justify-center gap-1 ${
+                      !state?.config?.auto_assign_tasks
+                        ? 'bg-indigo-600 text-white border-indigo-300 shadow-md ring-1 ring-indigo-400'
+                        : 'bg-surface-2 border-gray-700 text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <span>👤 User Only</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleAutoAssign(true)}
+                    className={`py-1.5 px-2 rounded text-[11px] font-bold transition-all border flex items-center justify-center gap-1 ${
+                      state?.config?.auto_assign_tasks
+                        ? 'bg-emerald-600 text-white border-emerald-300 shadow-md ring-1 ring-emerald-400'
+                        : 'bg-surface-2 border-gray-700 text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <span>🤖 Auto-Assign</span>
+                  </button>
+                </div>
+
+                <p className="text-[10px] text-gray-400 leading-tight">
+                  {!state?.config?.auto_assign_tasks
+                    ? '🎯 Active: Robots will only execute paths and destinations assigned by you.'
+                    : '⚡ Active: System autonomously generates random warehouse orders and assigns them to idle robots.'}
+                </p>
+              </div>
+
               {/* Robot Selector */}
               <div>
                 <label className="block text-[11px] font-semibold text-gray-300 mb-1">

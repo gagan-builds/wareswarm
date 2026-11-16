@@ -241,6 +241,16 @@ export const api = {
       body: JSON.stringify({ robot_id, priority }),
     }),
 
+  /**
+   * HTTP POST /api/sim/auto-assign
+   * Enables or disables automatic task generation & assignment.
+   */
+  setAutoAssign: (enabled: boolean, task_rate?: number) =>
+    request('/api/sim/auto-assign', {
+      method: 'POST',
+      body: JSON.stringify({ enabled, task_rate: task_rate ?? (enabled ? 0.3 : 0.0) }),
+    }),
+
   // ---- Map ----
 
   /**

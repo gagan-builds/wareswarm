@@ -79,6 +79,7 @@ class SwarmCoordinator:
         heuristic: str = "manhattan",
         connectivity: int = 4,
         allocation: str = "nearest",
+        auto_assign_tasks: bool = False,
     ) -> None:
         self.grid = grid
         self.robots = robots
@@ -89,6 +90,7 @@ class SwarmCoordinator:
         self.heuristic = heuristic
         self.connectivity = connectivity
         self.allocation = allocation
+        self.auto_assign_tasks = auto_assign_tasks
         self.events: list[dict] = []
 
     # ------------------------------------------------------------------
@@ -103,8 +105,9 @@ class SwarmCoordinator:
         """
         self.events = []
 
-        # 1. Allocate pending tasks to idle robots
-        self._allocate_tasks(current_tick)
+        # 1. Allocate pending tasks to idle robots (if auto_assign_tasks enabled)
+        if self.auto_assign_tasks:
+            self._allocate_tasks(current_tick)
 
         # 2. Plan / re-plan paths for robots that need it
         self._plan_paths(current_tick)

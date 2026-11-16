@@ -55,7 +55,8 @@ class SimConfig:
         connectivity: int = 4,
         coordination: str = "swarm",   # "swarm" | "naive"
         allocation: str = "nearest",   # "nearest" | "hungarian"
-        task_rate: float = 0.3,
+        task_rate: float = 0.0,
+        auto_assign_tasks: bool | None = None,
         seed: int | None = None,
         speed: float = 1.0,
         map_preset: str = "warehouse",
@@ -68,7 +69,11 @@ class SimConfig:
         self.connectivity = connectivity
         self.coordination = coordination
         self.allocation = allocation
-        self.task_rate = task_rate
+        if auto_assign_tasks is None:
+            self.auto_assign_tasks = (task_rate > 0.0)
+        else:
+            self.auto_assign_tasks = auto_assign_tasks
+        self.task_rate = task_rate if self.auto_assign_tasks else 0.0
         self.seed = seed
         self.speed = speed
         self.map_preset = map_preset
@@ -217,8 +222,8 @@ class Simulator:
         self.task_queue = TaskQueue()
         self.metrics = MetricsCollector()
 
-        # Seed initial tasks so all robots can immediately begin operations from C
-        if cfg.task_rate > 0:
+        # Seed initial tasks only if auto_assign_tasks is True and task_rate > 0
+        if getattr(cfg, "auto_assign_tasks", False) and cfg.task_rate > 0:
             storage_cells = self.grid.find_cells(CellType.STORAGE)
             dropoff_cells = self.grid.find_cells(CellType.DROPOFF)
             if storage_cells and dropoff_cells:
@@ -244,6 +249,7 @@ class Simulator:
             heuristic=cfg.heuristic,
             connectivity=cfg.connectivity,
             allocation=cfg.allocation,
+            auto_assign_tasks=getattr(cfg, "auto_assign_tasks", False),
         )
 
     def start(self) -> None:
@@ -303,8 +309,8 @@ class Simulator:
         self.tick += 1
         cfg = self.config
 
-        # Auto-generate tasks
-        if self._rng.random() < cfg.task_rate:
+        # Auto-generate tasks only if auto_assign_tasks is True
+        if getattr(cfg, "auto_assign_tasks", False) and self._rng.random() < cfg.task_rate:
             self._generate_random_task()
 
         tick_events: list[dict] = []
@@ -335,14 +341,15 @@ class Simulator:
         events: list[dict] = []
         cfg = self.config
 
-        # Assign tasks to idle robots (no coordination in assignment either)
-        idle = [r for r in self.robots if r.state == RobotState.IDLE]
-        pending = self.task_queue.get_pending()
-        for robot, task in zip(idle, pending):
-            task.status = TaskStatus.ASSIGNED
-            task.assigned_robot_id = robot.robot_id
-            task.assigned_tick = self.tick
-            robot.assign_task(task.task_id, self.tick)
+        # Assign tasks to idle robots only if auto_assign_tasks is True
+        if getattr(cfg, "auto_assign_tasks", False):
+            idle = [r for r in self.robots if r.state == RobotState.IDLE]
+            pending = self.task_queue.get_pending()
+            for robot, task in zip(idle, pending):
+                task.status = TaskStatus.ASSIGNED
+                task.assigned_robot_id = robot.robot_id
+                task.assigned_tick = self.tick
+                robot.assign_task(task.task_id, self.tick)
 
         # Plan paths for assigned robots
         for robot in self.robots:
@@ -549,6 +556,18 @@ class Simulator:
         robot.priority = max(1, min(4, int(priority)))
         return True
 
+    def set_auto_assign(self, enabled: bool, task_rate: float = 0.3) -> dict:
+        """Enable or disable automated task generation and assignment."""
+        self.config.auto_assign_tasks = enabled
+        self.config.task_rate = task_rate if enabled else 0.0
+        if self.coordinator:
+            self.coordinator.auto_assign_tasks = enabled
+        return {
+            "status": "success",
+            "auto_assign_tasks": self.config.auto_assign_tasks,
+            "task_rate": self.config.task_rate,
+        }
+
     def add_robot(self, row: int, col: int) -> Robot | None:
         """Add a new robot at position (row, col)."""
         if not self.grid.is_traversable(row, col):
@@ -658,6 +677,7 @@ class Simulator:
                 "coordination": self.config.coordination,
                 "allocation": self.config.allocation,
                 "task_rate": self.config.task_rate,
+                "auto_assign_tasks": getattr(self.config, "auto_assign_tasks", False),
                 "seed": self.config.seed,
                 "speed": self.config.speed,
                 "map_preset": self.config.map_preset,

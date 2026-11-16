@@ -214,6 +214,33 @@ export const api = {
       body: JSON.stringify({ row, col, cell_type }),
     }),
 
+  /**
+   * HTTP POST /api/sim/robots/assign
+   * Manually assign start, destination, and/or priority for a specific robot.
+   */
+  assignRobotRoute: (params: {
+    robot_id: number;
+    start_row?: number;
+    start_col?: number;
+    dest_row?: number;
+    dest_col?: number;
+    priority?: number;
+  }) =>
+    request('/api/sim/robots/assign', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
+
+  /**
+   * HTTP POST /api/sim/robots/priority
+   * Updates priority for an individual robot (1=Low, 2=Med, 3=High, 4=Critical).
+   */
+  setRobotPriority: (robot_id: number, priority: number) =>
+    request('/api/sim/robots/priority', {
+      method: 'POST',
+      body: JSON.stringify({ robot_id, priority }),
+    }),
+
   // ---- Map ----
 
   /**

@@ -27,27 +27,20 @@ import clsx from 'clsx';
 
 
 interface Props {
-
   running: boolean;
-
   paused: boolean;
-
   onStart: () => void;
-
   onPause: () => void;
-
   onResume: () => void;
-
   onStep: () => void;
-
   onReset: (newConfig?: Record<string, unknown>) => void;
-
   clickMode: string;
-
   setClickMode: (m: string) => void;
-
   state?: SimState | null;
-
+  selectedRobotId?: number | null;
+  setSelectedRobotId?: (id: number | null) => void;
+  onManualAssign?: (params: { robot_id: number; start_row?: number; start_col?: number; dest_row?: number; dest_col?: number; priority?: number }) => Promise<void>;
+  onSetPriority?: (robot_id: number, priority: number) => Promise<void>;
 }
 
 
@@ -65,27 +58,20 @@ interface Props {
  */
 
 export default function ControlPanel({
-
   running,
-
   paused,
-
   onStart,
-
   onPause,
-
   onResume,
-
   onStep,
-
   onReset,
-
   clickMode,
-
   setClickMode,
-
   state,
-
+  selectedRobotId,
+  setSelectedRobotId,
+  onManualAssign,
+  onSetPriority,
 }: Props) {
 
   // Local form state
@@ -125,6 +111,8 @@ export default function ControlPanel({
   const [openSections, setOpenSections] = useState({
 
     clickMode: true,
+
+    manualAssign: true,
 
     fleet: true,
 
@@ -175,7 +163,7 @@ export default function ControlPanel({
 
 
 
-  const toggleSection = (sec: 'clickMode' | 'fleet' | 'sim') => {
+  const toggleSection = (sec: 'clickMode' | 'manualAssign' | 'fleet' | 'sim') => {
 
     setOpenSections(p => ({ ...p, [sec]: !p[sec] }));
 
@@ -641,6 +629,8 @@ export default function ControlPanel({
 
                   { mode: 'free', label: '🧹 Free / Erase' },
 
+                  { mode: 'assign_robot', label: '🎯 Set Destination' },
+
                   { mode: 'none', label: '⬜ Normal' },
 
                 ].map(({ mode, label }) => (
@@ -701,6 +691,11 @@ export default function ControlPanel({
                     🧹 <strong>Free / Erase Mode</strong>: Click on any cell on the grid to erase it to open floor.
                   </span>
                 )}
+                {clickMode === 'assign_robot' && (
+                  <span className="text-sky-400 font-medium">
+                    🎯 <strong>Destination Target Mode</strong>: Click any free cell on the grid to set as the destination for the selected robot.
+                  </span>
+                )}
                 {clickMode === 'none' && (
                   <span className="text-gray-400">
                     Select a tool above to draw on the warehouse floor grid.
@@ -741,6 +736,220 @@ export default function ControlPanel({
         </div>
 
 
+
+        {/* Accordion: User Robot Priority & Destination Assignment */}
+        <div className="bg-surface-2/40 border border-sky-500/40 rounded-xl overflow-hidden shadow-lg shadow-sky-950/20">
+          <button
+            type="button"
+            onClick={() => toggleSection('manualAssign')}
+            className="w-full px-3 py-2 text-left flex justify-between items-center text-xs font-semibold text-sky-300 hover:text-white bg-sky-950/40 border-b border-sky-500/20"
+          >
+            <span className="flex items-center gap-1.5">
+              <span>🎯</span>
+              <span>ROBOT ROUTE & PRIORITY</span>
+            </span>
+            <span className="text-sky-400">{openSections.manualAssign ? '▴' : '▾'}</span>
+          </button>
+
+          {(openSections.manualAssign ?? true) && (
+            <div className="p-3 space-y-3">
+              {/* Robot Selector */}
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-300 mb-1">
+                  Select Robot to Assign:
+                </label>
+                <div className="grid grid-cols-5 gap-1.5 max-h-28 overflow-y-auto p-1 bg-surface-2 rounded-lg border border-gray-700">
+                  {(state?.robots || []).map(r => {
+                    const isSel = selectedRobotId === r.id;
+                    const p = r.priority ?? 2;
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => setSelectedRobotId && setSelectedRobotId(r.id)}
+                        className={`py-1.5 px-1 rounded flex flex-col items-center justify-center text-xs font-bold transition-all border ${
+                          isSel
+                            ? 'bg-sky-600 text-white border-sky-300 shadow-md scale-105'
+                            : 'bg-surface border-gray-700 text-gray-300 hover:bg-gray-700'
+                        }`}
+                        style={{ borderLeftColor: r.color, borderLeftWidth: '3px' }}
+                      >
+                        <span>R{r.id}</span>
+                        <span className={`text-[9px] font-mono px-1 rounded ${
+                          p === 4 ? 'bg-rose-950 text-rose-300' : p === 3 ? 'bg-amber-950 text-amber-300' : 'text-gray-400'
+                        }`}>
+                          P{p}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Selected Robot Controls */}
+              {(() => {
+                const activeR = (state?.robots || []).find(r => r.id === selectedRobotId) || state?.robots?.[0];
+                if (!activeR) {
+                  return (
+                    <div className="text-center text-xs text-gray-500 py-2">
+                      Spawn robots first to customize priority and routing.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="bg-surface/80 rounded-lg p-2.5 border border-gray-700/80 space-y-2.5 text-xs">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-gray-700/60">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-3 h-3 rounded-full border border-white/60"
+                          style={{ backgroundColor: activeR.color }}
+                        />
+                        <span className="font-bold text-white">Robot #{activeR.id}</span>
+                        <span className="text-[10px] text-gray-400 uppercase font-mono px-1.5 py-0.5 rounded bg-surface-2">
+                          {activeR.state}
+                        </span>
+                      </div>
+                      <span className="text-gray-400 font-mono text-[11px]">
+                        Pos: ({activeR.row}, {activeR.col})
+                      </span>
+                    </div>
+
+                    {/* Robot Priority Selector */}
+                    <div>
+                      <div className="flex justify-between items-center mb-1 text-[11px] font-medium text-gray-300">
+                        <span>Swarm Right-of-Way Priority:</span>
+                        <span className={`font-bold ${
+                          (activeR.priority ?? 2) === 4 ? 'text-rose-400' :
+                          (activeR.priority ?? 2) === 3 ? 'text-amber-400' :
+                          (activeR.priority ?? 2) === 1 ? 'text-gray-400' : 'text-sky-400'
+                        }`}>
+                          { (activeR.priority ?? 2) === 4 ? 'Critical (Highest)' :
+                            (activeR.priority ?? 2) === 3 ? 'High Priority' :
+                            (activeR.priority ?? 2) === 1 ? 'Low Priority' : 'Normal (Med)' }
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1">
+                        {[
+                          { level: 1, label: 'Low', col: 'hover:border-gray-500' },
+                          { level: 2, label: 'Med', col: 'hover:border-sky-500' },
+                          { level: 3, label: 'High', col: 'hover:border-amber-500' },
+                          { level: 4, label: 'Top', col: 'hover:border-rose-500' },
+                        ].map(({ level, label }) => {
+                          const isCur = (activeR.priority ?? 2) === level;
+                          return (
+                            <button
+                              key={level}
+                              type="button"
+                              onClick={() => onSetPriority && onSetPriority(activeR.id, level)}
+                              className={`py-1 text-[11px] font-bold rounded border transition-all ${
+                                isCur
+                                  ? level === 4 ? 'bg-rose-600 text-white border-rose-400 shadow' :
+                                    level === 3 ? 'bg-amber-600 text-white border-amber-400 shadow' :
+                                    level === 1 ? 'bg-gray-600 text-white border-gray-400 shadow' :
+                                    'bg-sky-600 text-white border-sky-400 shadow'
+                                  : 'bg-surface-2 border-gray-700 text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="text-[10px] text-gray-400 mt-1 italic">
+                        Higher priority robots never yield in narrow aisles and reserve paths first.
+                      </div>
+                    </div>
+
+                    {/* Start Position & Destination Controls */}
+                    <div className="pt-1.5 border-t border-gray-700/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-gray-300 text-[11px]">Manual Route Assignment:</span>
+                        <button
+                          type="button"
+                          onClick={() => setClickMode('assign_robot')}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+                            clickMode === 'assign_robot'
+                              ? 'bg-amber-500 text-black border-amber-300 animate-pulse'
+                              : 'bg-surface-2 text-sky-300 border-sky-500/50 hover:bg-sky-950'
+                          }`}
+                        >
+                          {clickMode === 'assign_robot' ? '🎯 Click Grid for Dest' : '🖱️ Pick on Grid'}
+                        </button>
+                      </div>
+
+                      {/* Manual Coordinates Inputs */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[10px] text-gray-400 block mb-0.5">Start (R, C):</span>
+                          <div className="flex gap-1">
+                            <input
+                              type="number"
+                              placeholder="Row"
+                              id="custom_start_r"
+                              defaultValue={activeR.start_pos?.[0] ?? activeR.row}
+                              className="w-full bg-surface-2 text-white text-xs rounded px-1.5 py-1 border border-gray-700 font-mono"
+                            />
+                            <input
+                              type="number"
+                              placeholder="Col"
+                              id="custom_start_c"
+                              defaultValue={activeR.start_pos?.[1] ?? activeR.col}
+                              className="w-full bg-surface-2 text-white text-xs rounded px-1.5 py-1 border border-gray-700 font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] text-gray-400 block mb-0.5">Destination (R, C):</span>
+                          <div className="flex gap-1">
+                            <input
+                              type="number"
+                              placeholder="Row"
+                              id="custom_dest_r"
+                              defaultValue={activeR.target_destination?.[0] ?? ''}
+                              className="w-full bg-surface-2 text-white text-xs rounded px-1.5 py-1 border border-gray-700 font-mono"
+                            />
+                            <input
+                              type="number"
+                              placeholder="Col"
+                              id="custom_dest_c"
+                              defaultValue={activeR.target_destination?.[1] ?? ''}
+                              className="w-full bg-surface-2 text-white text-xs rounded px-1.5 py-1 border border-gray-700 font-mono"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const sr = (document.getElementById('custom_start_r') as HTMLInputElement)?.value;
+                          const sc = (document.getElementById('custom_start_c') as HTMLInputElement)?.value;
+                          const dr = (document.getElementById('custom_dest_r') as HTMLInputElement)?.value;
+                          const dc = (document.getElementById('custom_dest_c') as HTMLInputElement)?.value;
+                          if (onManualAssign) {
+                            onManualAssign({
+                              robot_id: activeR.id,
+                              start_row: sr !== '' ? Number(sr) : undefined,
+                              start_col: sc !== '' ? Number(sc) : undefined,
+                              dest_row: dr !== '' ? Number(dr) : undefined,
+                              dest_col: dc !== '' ? Number(dc) : undefined,
+                              priority: activeR.priority ?? 2,
+                            });
+                          }
+                        }}
+                        className="w-full py-1.5 px-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <span>🚀</span> Dispatch Robot #{activeR.id} to Destination
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
 
         {/* Accordion 2: Fleet & Map Configuration */}
 

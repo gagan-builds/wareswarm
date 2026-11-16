@@ -69,6 +69,9 @@ class Robot:
         total_wait:     Cumulative ticks spent waiting.
         total_moving:   Cumulative ticks spent moving.
         tasks_done:     Number of completed tasks.
+    priority:       User-assigned priority level (1=Low, 2=Medium, 3=High, 4=Critical).
+    start_pos:      Original spawn or home charging bay (row, col).
+    target_destination: Optional user-assigned manual goal / destination (row, col).
     """
     robot_id: int
     row: int
@@ -82,6 +85,10 @@ class Robot:
     waiting_ticks: int = 0
     replan_count: int = 0
     needs_replan: bool = False
+    # User priority and custom routing
+    priority: int = 2  # 1: Low, 2: Medium, 3: High, 4: Critical
+    start_pos: tuple[int, int] | None = None
+    target_destination: tuple[int, int] | None = None
     # Metrics
     total_distance: float = 0.0
     total_wait: int = 0
@@ -134,6 +141,9 @@ class Robot:
             "carrying": self.carrying_task,
             "task_id": self.task_id,
             "color": self.color,
+            "priority": self.priority,
+            "start_pos": list(self.start_pos) if self.start_pos else [self.row, self.col],
+            "target_destination": list(self.target_destination) if self.target_destination else None,
             "waiting_ticks": self.waiting_ticks,
             "replan_count": self.replan_count,
             "metrics": {

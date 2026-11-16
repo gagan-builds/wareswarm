@@ -36,6 +36,7 @@ export default function SimulatorPage() {
   const [demoLoggingIn, setDemoLoggingIn] = useState(false);
   const { state, status, refresh, setState } = useSimWebSocket();
   const [clickMode, setClickMode] = useState<string>('none');
+  const [selectedRobotId, setSelectedRobotId] = useState<number | null>(null);
   const [taskPickup, setTaskPickup] = useState<[number, number] | null>(null);
   const [customApiInput, setCustomApiInput] = useState('');
   const [isConnectingCustom, setIsConnectingCustom] = useState(false);
@@ -46,6 +47,40 @@ export default function SimulatorPage() {
       setCustomApiInput(saved);
     }
   }, []);
+
+  // Default selected robot if not set
+  useEffect(() => {
+    if (state?.robots && state.robots.length > 0) {
+      if (selectedRobotId === null || !state.robots.some((r) => r.id === selectedRobotId)) {
+        setSelectedRobotId(state.robots[0].id);
+      }
+    }
+  }, [state?.robots, selectedRobotId]);
+
+  const handleManualAssign = async (params: {
+    robot_id: number;
+    start_row?: number;
+    start_col?: number;
+    dest_row?: number;
+    dest_col?: number;
+    priority?: number;
+  }) => {
+    try {
+      await api.assignRobotRoute(params);
+      await refresh();
+    } catch (err) {
+      console.error('Failed to manually assign robot route:', err);
+    }
+  };
+
+  const handleSetPriority = async (robot_id: number, priority: number) => {
+    try {
+      await api.setRobotPriority(robot_id, priority);
+      await refresh();
+    } catch (err) {
+      console.error('Failed to set robot priority:', err);
+    }
+  };
 
   const handleSetCustomApi = (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,12 +217,20 @@ export default function SimulatorPage() {
         }
         await api.toggleCell(row, col, 0);
         await refresh();
+      } else if (clickMode === 'assign_robot') {
+        if (selectedRobotId !== null && selectedRobotId !== undefined) {
+          await handleManualAssign({
+            robot_id: selectedRobotId,
+            dest_row: row,
+            dest_col: col,
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to update cell:', err);
       await refresh();
     }
-  }, [clickMode, refresh, state, setState]);
+  }, [clickMode, refresh, state, setState, selectedRobotId]);
 
   const m = state?.metrics;
 
@@ -279,6 +322,10 @@ export default function SimulatorPage() {
             clickMode={clickMode}
             setClickMode={setClickMode}
             state={state}
+            selectedRobotId={selectedRobotId}
+            setSelectedRobotId={setSelectedRobotId}
+            onManualAssign={handleManualAssign}
+            onSetPriority={handleSetPriority}
           />
         </div>
 
@@ -318,7 +365,9 @@ export default function SimulatorPage() {
           <WarehouseCanvas
             state={state}
             onCellClick={handleCellClick}
-            clickMode={clickMode as 'obstacle' | 'robot' | 'task_pickup' | 'task_dropoff' | 'none'}
+            clickMode={clickMode as any}
+            selectedRobotId={selectedRobotId}
+            onSelectRobot={setSelectedRobotId}
           />
         </div>
 

@@ -136,6 +136,20 @@ class RobotRequest(BaseModel):
 
 
 
+class AssignRobotRouteRequest(BaseModel):
+    robot_id: int
+    start_row: Optional[int] = None
+    start_col: Optional[int] = None
+    dest_row: Optional[int] = None
+    dest_col: Optional[int] = None
+    priority: Optional[int] = None  # 1: Low, 2: Med, 3: High, 4: Critical
+
+
+class RobotPriorityRequest(BaseModel):
+    robot_id: int
+    priority: int = Field(default=2, ge=1, le=4)
+
+
 class ObstacleRequest(BaseModel):
 
     row: int
@@ -394,6 +408,36 @@ async def add_robot(req: RobotRequest):
 
 
 
+
+
+@router.post("/robots/assign")
+async def assign_robot_route(req: AssignRobotRouteRequest):
+    """
+    User manually assigns start, destination, and/or priority to an individual robot.
+    Bypasses automated task pairing for this robot.
+    """
+    res = simulator.assign_robot_manual(
+        robot_id=req.robot_id,
+        start_row=req.start_row,
+        start_col=req.start_col,
+        dest_row=req.dest_row,
+        dest_col=req.dest_col,
+        priority=req.priority,
+    )
+    if res.get("status") == "error":
+        raise HTTPException(400, res.get("message", "Failed to assign robot"))
+    await _notify()
+    return res
+
+
+@router.post("/robots/priority")
+async def set_robot_priority_endpoint(req: RobotPriorityRequest):
+    """Update priority for an individual robot."""
+    ok = simulator.set_robot_priority(req.robot_id, req.priority)
+    if not ok:
+        raise HTTPException(404, f"Robot {req.robot_id} not found")
+    await _notify()
+    return {"status": "success", "robot_id": req.robot_id, "priority": req.priority}
 
 
 @router.post("/obstacle")

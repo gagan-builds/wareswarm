@@ -209,6 +209,7 @@ class Simulator:
                 robot_id=i + 1,
                 row=r, col=c,
                 color=ROBOT_COLORS[i % len(ROBOT_COLORS)],
+                start_pos=(r, c),
             )
             self.robots.append(robot)
 
@@ -449,6 +450,105 @@ class Simulator:
         """Manually create a task (called from REST API)."""
         return self.task_queue.create_task(pickup_row, pickup_col, dropoff_row, dropoff_col, self.tick)
 
+    def assign_robot_manual(
+        self,
+        robot_id: int,
+        start_row: int | None = None,
+        start_col: int | None = None,
+        dest_row: int | None = None,
+        dest_col: int | None = None,
+        priority: int | None = None,
+    ) -> dict:
+        """
+        Assign manual start/destination and priority to an individual robot.
+        If start coordinates are provided, relocates the robot if cell is traversable and free.
+        Creates a dedicated transport task or direct route from start to destination.
+        """
+        robot = next((r for r in self.robots if r.robot_id == robot_id), None)
+        if not robot:
+            return {"status": "error", "message": f"Robot {robot_id} not found"}
+
+        # 1. Update priority if provided
+        if priority is not None:
+            robot.priority = max(1, min(4, int(priority)))
+
+        # 2. Relocate start position if specified and valid
+        if start_row is not None and start_col is not None:
+            if not self.grid.is_traversable(start_row, start_col):
+                return {"status": "error", "message": f"Start position ({start_row}, {start_col}) is not traversable"}
+            # Check not occupied by another robot
+            for other in self.robots:
+                if other.robot_id != robot_id and other.row == start_row and other.col == start_col:
+                    return {"status": "error", "message": f"Cell ({start_row}, {start_col}) is occupied by Robot {other.robot_id}"}
+            robot.row = start_row
+            robot.col = start_col
+            robot.start_pos = (start_row, start_col)
+            if self.grid.cell_type(start_row, start_col) == CellType.FREE:
+                self.grid.set_cell(start_row, start_col, CellType.CHARGING)
+
+        # 3. Assign manual destination / task
+        if dest_row is not None and dest_col is not None:
+            if not self.grid.is_traversable(dest_row, dest_col):
+                return {"status": "error", "message": f"Destination ({dest_row}, {dest_col}) is an obstacle"}
+            
+            robot.target_destination = (dest_row, dest_col)
+            
+            # Cancel any existing task
+            if robot.task_id:
+                old_task = self.task_queue.get_by_id(robot.task_id)
+                if old_task and old_task.status in (TaskStatus.ASSIGNED, TaskStatus.IN_FLIGHT):
+                    old_task.status = TaskStatus.FAILED
+
+            # Create dedicated user task from current position (or start) to destination
+            task = self.task_queue.create_task(
+                pickup_row=robot.row,
+                pickup_col=robot.col,
+                dropoff_row=dest_row,
+                dropoff_col=dest_col,
+                created_tick=self.tick,
+                priority=True,
+            )
+            task.status = TaskStatus.ASSIGNED
+            task.assigned_robot_id = robot.robot_id
+            task.assigned_tick = self.tick
+            robot.assign_task(task.task_id, self.tick)
+
+            # Plan path directly
+            if self.coordinator:
+                goal = (dest_row, dest_col)
+                if self.coordinator._plan_for_robot(robot, goal, self.tick):
+                    robot.state = RobotState.MOVING_TO_DROPOFF
+                    robot.carrying_task = True
+            else:
+                goal = (dest_row, dest_col)
+                res = self._run_planner_naive(robot, goal)
+                if res.success:
+                    robot.set_path(res.path, goal)
+                    robot.state = RobotState.MOVING_TO_DROPOFF
+                    robot.carrying_task = True
+
+            self.events_log.append({
+                "type": "user_assigned_route",
+                "tick": self.tick,
+                "robot_id": robot.robot_id,
+                "start": [robot.row, robot.col],
+                "destination": [dest_row, dest_col],
+                "priority": robot.priority,
+            })
+
+        return {
+            "status": "success",
+            "robot": robot.to_dict(),
+        }
+
+    def set_robot_priority(self, robot_id: int, priority: int) -> bool:
+        """Update individual robot priority (1: Low, 2: Medium, 3: High, 4: Critical)."""
+        robot = next((r for r in self.robots if r.robot_id == robot_id), None)
+        if not robot:
+            return False
+        robot.priority = max(1, min(4, int(priority)))
+        return True
+
     def add_robot(self, row: int, col: int) -> Robot | None:
         """Add a new robot at position (row, col)."""
         if not self.grid.is_traversable(row, col):
@@ -461,6 +561,7 @@ class Simulator:
         robot = Robot(
             robot_id=rid, row=row, col=col,
             color=ROBOT_COLORS[(rid - 1) % len(ROBOT_COLORS)],
+            start_pos=(row, col),
         )
         self.robots.append(robot)
         if self.grid.cell_type(row, col) == CellType.FREE:

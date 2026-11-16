@@ -41,13 +41,21 @@ def compute_priority(robot: "Robot") -> tuple:
 
     Python tuple comparison is lexicographic, so the first element has the
     most weight.
+    Order of factors:
+        1. User-assigned Robot Priority (Critical: 4 > High: 3 > Med: 2 > Low: 1)
+        2. Cargo State: Carrying payload (1) > Empty (0)
+        3. Proximity to Goal: Fewer steps remaining > Farther away
+        4. Starvation: Waiting ticks
+        5. Deterministic tie-breaker: Lower robot ID
     """
     from app.core.robot import RobotState
+    user_prio = getattr(robot, "priority", 2)
     is_carrying = int(robot.state == RobotState.CARRYING or
                       robot.state == RobotState.MOVING_TO_DROPOFF)
     distance_to_goal = len(robot.path) if robot.path else 9999
     # Negate distance so shorter distance = higher priority number
     return (
+        user_prio,              # User custom priority score takes top precedence
         is_carrying,            # 1 beats 0
         -distance_to_goal,      # -1 beats -100
         robot.waiting_ticks,    # more waiting = higher priority
